@@ -1,0 +1,171 @@
+# --------------------------------------------------------------------------------------
+# Agronomic cost model for the olive field-triage expert system.
+#
+# WHY THIS FILE EXISTS
+#
+# v1 hard-coded the cost matrix as 40 / 25 / 10 / 3 / 8 inside
+# `eswa_expert_system.default_cost_matrix()` (:433-456) with no units, no elicitation
+# and no citation, and then reported "a 49.3% reduction in expected mis-management
+# cost" as a headline result. For an Expert Systems with Applications paper the cost
+# model IS the contribution, so an asserted matrix is the weakest link in the whole
+# submission.
+#
+# Every parameter below carries a value, a plausible range and a `source`.
+# `CostModel.matrix()` composes them into the 5x5 matrix; `monte_carlo()` samples all
+# of them jointly. A reviewer can now disagree with `oil_downgrade_fraction` instead of
+# with an opaque 40.
+#
+# SOURCING POLICY (honest): parameters that map onto a measurable agronomic/economic
+# quantity are set from the peer-reviewed olive-pathology and market literature and
+# carry a citation. The remaining parameters are OPERATIONAL SCENARIO assumptions
+# (scouting cadence, spatial spread, wrong-treatment penalty) that no single paper
+# fixes; these are declared as documented assumptions and are varied over wide ranges
+# in the joint Monte-Carlo sensitivity analysis, and the break-even ratio is reported,
+# so no conclusion rests on any one value. No formal multi-expert elicitation was run;
+# this is stated rather than dressed up as one.
+# --------------------------------------------------------------------------------------
+
+currency: "EUR per affected tree, single season"
+
+elicitation: >
+  Parameters were set from the published literature where a measurable quantity exists
+  (fruit value per tree, oil-grade downgrade from anthracnose, olive-moth damage,
+  copper application cost), each cited in its `source` field. The remaining parameters
+  (detection_lag_days, spread_factor, wrong_treatment_multiplier,
+  untreated_residual_fraction, organ_confusion_cost) are operational scenario
+  assumptions for a typical rain-fed Mediterranean orchard on a weekly-to-biweekly
+  scouting cadence; they are documented as assumptions rather than cited, and every
+  parameter is sampled jointly over its [low, high] range in monte_carlo() with the
+  break-even miss:false-alarm ratio reported, so the conclusion does not depend on any
+  single point value. A formal multi-expert elicitation was NOT performed; this is
+  disclosed rather than overstated.
+
+# Cost of routing one image to a human agronomist, in the same units as the matrix.
+# Sets the automation rate, so it is treated as a sensitivity variable, not a constant.
+referral_cost: 1.0
+
+parameters:
+
+  copper_spray_cost:
+    value: 3.0
+    low: 1.5
+    high: 6.0
+    unit: "EUR per tree"
+    source: >
+      Vitanovic, E. (2012) "Use of Cu Fungicides in Vineyards and Olive Groves",
+      InTech (fungicides book), and regional olive extension guidance: copper is the
+      standard preventive against olive fruit/leaf fungal disease, applied 2-4 times per
+      season; per-tree material+labour cost of one application in a traditional orchard
+      is a few EUR. Range spans low-input rain-fed to intensive regimes.
+    note: >
+      One preventive copper application = the cost of a false alarm, and the denominator
+      of the break-even ratio.
+
+  fruit_value_per_tree:
+    value: 40.0
+    low: 20.0
+    high: 90.0
+    unit: "EUR per tree"
+    source: >
+      A mature traditional olive tree yields ~25-50 kg olives -> ~4-8 L oil per season
+      (olive-yield and oil-conversion figures, ~4-8 kg olives/L); olive-oil farmgate
+      price ~EUR 4-9 / kg (2023-2025 European market, Tridge / harvest reports). Gross
+      fruit value per mature tree therefore ~EUR 20-90 depending on year and price.
+    note: "Gross value of one mature tree's fruit in a normal season."
+
+  oil_downgrade_fraction:
+    value: 0.35
+    low: 0.15
+    high: 0.60
+    unit: "fraction of fruit value"
+    source: >
+      Moral et al. (2014), cited in Moral et al. Front. Plant Sci. 8:1892 (2017): even
+      at 5% fruit-rot incidence the oil shows chemical/organoleptic defects that
+      "restrict or impede its commercialization as extra virgin olive oil"; anthracnose
+      raises free acidity and downgrades oil from EVOO to lampante (refining) grade.
+      EVOO commands roughly a 30-60% price premium over lampante, so loss of grade
+      removes ~0.15-0.60 of fruit value.
+    note: >
+      The single parameter that makes fruit anthracnose the dominant cost and justifies
+      the matrix asymmetry.
+
+  detection_lag_days:
+    value: 10.0
+    low: 3.0
+    high: 21.0
+    unit: "days"
+    source: >
+      OPERATIONAL ASSUMPTION (documented, not cited): days between a missed detection
+      and the next scouting round on a weekly-to-biweekly IPM cadence. Varied 3-21 d in
+      the sensitivity analysis.
+    note: "Scouting interval scenario."
+
+  yield_loss_per_day:
+    value: 0.010
+    low: 0.003
+    high: 0.025
+    unit: "fraction of tree value per day"
+    source: >
+      Derived from the epidemic loss range for olive anthracnose (severe wet-season
+      epidemics in susceptible cultivars approach near-total crop loss; Talhinhas et al.
+      2018, Mol. Plant Pathol. 19:1716, review) spread over the weeks-long susceptibility
+      window: a marginal ~0.3-2.5% of tree value per untreated day. Varied in sensitivity.
+    note: "Marginal damage accumulation while an anthracnose infection goes untreated."
+
+  spread_factor:
+    value: 1.8
+    low: 1.0
+    high: 3.5
+    unit: "multiplier"
+    source: >
+      OPERATIONAL ASSUMPTION (documented, not cited): multiplier for secondary spread of
+      Colletotrichum inoculum to neighbouring trees within the lag window. 1.0 = no-spread
+      lower-bound scenario; varied to 3.5 in the sensitivity analysis.
+    note: "Transmission to neighbouring trees; setting to 1.0 removes the spread argument."
+
+  caterpillar_defoliation_loss:
+    value: 0.004
+    low: 0.001
+    high: 0.012
+    unit: "fraction of tree value per day"
+    source: >
+      Olive moth (Prays oleae): across its three generations the pest can reduce
+      production by 50-60%, and the fruit-feeding (carpophagous) generation infests
+      ~14-48% of fruit in untreated controls (Navarro et al., mating-disruption study,
+      Insects 2021, PMC8708720). Damage is defoliation/fruit-drop driven with NO
+      oil-grade effect, hence a lower per-day rate than anthracnose.
+    note: "Defoliation/fruit-drop loss; no oil-grade effect."
+
+  wrong_treatment_multiplier:
+    value: 1.5
+    low: 1.0
+    high: 3.0
+    unit: "multiplier on spray cost"
+    source: >
+      OPERATIONAL ASSUMPTION (documented, not cited): applying the wrong product costs
+      the product plus a wasted pass; a fungicide applied to a caterpillar problem (or
+      vice versa) is ~1-3x a single copper spray. Varied in sensitivity.
+    note: "Cost of applying the wrong product."
+
+  untreated_residual_fraction:
+    value: 0.6
+    low: 0.3
+    high: 0.9
+    unit: "fraction"
+    source: >
+      OPERATIONAL ASSUMPTION (documented, not cited): when the wrong disease is treated,
+      the true disease remains largely untreated; the fraction of the missed-disease cost
+      still incurred is ~0.3-0.9 depending on partial cross-efficacy. Varied in sensitivity.
+    note: "Residual missed-disease cost after a wrong treatment."
+
+  organ_confusion_cost:
+    value: 0.5
+    low: 0.0
+    high: 2.0
+    unit: "EUR per tree"
+    source: >
+      OPERATIONAL ASSUMPTION (documented, not cited): healthy leaf mistaken for healthy
+      fruit or vice versa is operationally harmless but non-zero because it corrupts the
+      orchard record. Section 4.8 shows these organ confusions are already near zero, so
+      the result is insensitive to this value; range 0-2 confirms it.
+    note: "Near-harmless record-keeping error; result is insensitive to it."
